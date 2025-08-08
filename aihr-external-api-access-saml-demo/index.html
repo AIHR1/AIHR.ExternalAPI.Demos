@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Home</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>Home Page</h1>
+      <div id="user-info">You are currently unauthenticated</div>
+      <button class="primary" id="getLearningCatalogBtn">
+        Get Learning Catalog
+      </button>
+      <button class="primary" id="getLearningProgressBtn">
+        Get Learning Progress
+      </button>
+
+      <div style="margin: 10px">
+        <button class="success" id="auth-btn">Login</button>
+      </div>
+    </div>
+
+    <script type="module">
+      import auth0 from "./auth.js";
+
+      window.onload = async () => {
+        const query = window.location.search;
+
+        if (query.includes("code=") && query.includes("state=")) {
+          await auth0.handleRedirectCallback();
+          window.history.replaceState({}, document.title, "/");
+        }
+
+        const isAuthenticated = await auth0.isAuthenticated();
+
+        if (!isAuthenticated) {
+          return;
+        }
+
+        const authButton = document.getElementById("auth-btn");
+        authButton.innerHTML = "Logout";
+        authButton.className = "warning";
+
+        const user = await auth0.getUser();
+        document.getElementById("user-info").innerHTML = `
+            <p><strong>Id:</strong> ${user.bnw_user_id}</p>
+            <p><strong>Name:</strong> ${user.name}</p>
+            <p><strong>Email:</strong> ${user.email}</p>
+        `;
+      };
+
+      document
+        .getElementById("auth-btn")
+        .addEventListener("click", async () => {
+          const isAuthenticated = await auth0.isAuthenticated();
+
+          if (isAuthenticated) {
+            await auth0.logout({
+              logoutParams: { returnTo: window.location.origin },
+            });
+          } else {
+            await auth0.loginWithRedirect();
+          }
+        });
+
+      document
+        .getElementById("getLearningCatalogBtn")
+        .addEventListener("click", getLearningCatalog);
+      document
+        .getElementById("getLearningProgressBtn")
+        .addEventListener("click", getLearningProgress);
+
+      async function getLearningCatalog() {
+        const isAuthenticated = await auth0.isAuthenticated();
+
+        if (!isAuthenticated) {
+          return alert("Please login first using the login button");
+        }
+
+        const token = await auth0.getTokenSilently();
+        const response = await fetch(
+          "https://dev.burnwood.aihr.com/lms/external/api/v1/learningcatalog/search",
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const json = await response.json();
+        console.log(json);
+        alert("Operation is successful");
+      }
+
+      async function getLearningProgress() {
+        const isAuthenticated = await auth0.isAuthenticated();
+
+        if (!isAuthenticated) {
+          return alert("Please login first using the login button");
+        }
+
+        const userId = (await auth0.getUser())?.bnw_user_id;
+        const token = await auth0.getTokenSilently();
+        const response = await fetch(
+          "https://dev.burnwood.aihr.com/adoption/external/api/Adoption/10/1?api-version=1.0",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              filters: {
+                userIds: userId,
+              },
+              sort: {
+                sorts: [
+                  {
+                    direction: "",
+                    property: "",
+                  },
+                ],
+              },
+            }),
+          }
+        );
+
+        const json = await response.json();
+        console.log(json);
+        alert("Operation is successful");
+      }
+    </script>
+  </body>
+</html>
